@@ -11,7 +11,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.apache.commons.collections4.CollectionUtils;
@@ -35,7 +34,7 @@ public class ExtendSolrItemFieldProvider implements ISolrItemExternalFieldProvid
 			for ( ExtenderType<? extends IExtendableResourceResult> extender : ResourceExtenderServiceFacade.getListExtenderType( ) )
 		    {
 		       try {            	
-		          	addExtendFields(entry.getValue( ), extender.getInfoExtenderByList(entry.getValue().stream().map(SolrItem::getIdResource).collect(Collectors.toList( )), entry.getKey( )));						
+		          	addExtendFields(extender.getType( ) , entry.getValue( ), extender.getInfoExtenderByList(entry.getValue().stream().map(SolrItem::getIdResource).collect(Collectors.toList( )), entry.getKey( )));						
 		        } catch (InfoExtenderException e) {
 		                    	
 		           	AppLogService.debug( e.getMessage( ), e );
@@ -52,12 +51,12 @@ public class ExtendSolrItemFieldProvider implements ISolrItemExternalFieldProvid
 	 * @param extenderResultObject
 	 * 			the ExtendableResourceResult object
 	 */
-	private <T extends IExtendableResourceResult>  void  addExtendFields( List<SolrItem> solrItems, List<T> extenderResultObject ) {
+	private <T extends IExtendableResourceResult>  void  addExtendFields(String extenderType, List<SolrItem> solrItems, List<T> extenderResultObject ) {
 		
 		if(CollectionUtils.isNotEmpty( extenderResultObject )) 
 		{
 			solrItems.forEach(item ->			
-					setPropertyDescriptor(item,
+					setPropertyDescriptor(extenderType, item,
 							extenderResultObject.stream()
 					.filter(bean -> 
 					item.getIdResource( ).equals( bean.getIdExtendableResource( ) ) && item.getType().equals(bean.getExtendableResourceType( ))).collect(Collectors.toList())			
@@ -74,28 +73,25 @@ public class ExtendSolrItemFieldProvider implements ISolrItemExternalFieldProvid
 	 * @param extenderResultObject
 	 * 			the ExtendableResourceResult object
 	 */
-	private <T extends IExtendableResourceResult> void setPropertyDescriptor( SolrItem solrItem, List<T> extenderResultObject ) 
+	private <T extends IExtendableResourceResult> void setPropertyDescriptor( String extenderType, SolrItem solrItem, List<T> extenderResultObject ) 
 	{		
-		AtomicInteger count=new AtomicInteger( 0 );	 
 		extenderResultObject.forEach( bean -> {
+			SolrItem item= new SolrItem();
+			item.setType( extenderType );
 				List<PropertyDescriptor> beanGettersList = getBeanInfo( bean );
 				beanGettersList.forEach( pd -> {
-					
-					if(!pd.getName().equals("idExtendableResource") && !pd.getName().equals("extendableResourceType")) {	
+						if(!pd.getName().equals("idExtendableResource") && !pd.getName().equals("extendableResourceType")) {	
 						
-						String strName = null;
-						if(count.get( ) == 0) {
-							strName=pd.getName();
-						}else {
-							strName= pd.getName()+ "_" +count;
-						}
+						String strName = null;						
+						strName= pd.getName();
+						
 						try 
 						{
 							if( Number.class.isAssignableFrom(pd.getPropertyType()) || pd.getPropertyType().getCanonicalName().equals("int") || pd.getPropertyType().getCanonicalName().equals("long"))
 							{
 								Object value= pd.getReadMethod()!=null?pd.getReadMethod().invoke(bean):null;
 								if(value != null ) {
-									solrItem.addDynamicField(strName, Long.valueOf(value.toString( )));	
+									item.addDynamicField(strName, Long.valueOf(value.toString( )));	
 								}
 							}
 							else if(Date.class.isAssignableFrom(pd.getPropertyType()))
@@ -103,7 +99,7 @@ public class ExtendSolrItemFieldProvider implements ISolrItemExternalFieldProvid
 								Object value= pd.getReadMethod()!=null?pd.getReadMethod().invoke(bean):null;
 								if( value != null ) 
 								{
-									solrItem.addDynamicField( strName, (Date) value );
+									item.addDynamicField( strName, (Date) value );
 								}
 							}
 							else
@@ -111,7 +107,7 @@ public class ExtendSolrItemFieldProvider implements ISolrItemExternalFieldProvid
 								Object value= pd.getReadMethod()!=null?pd.getReadMethod().invoke(bean):null;
 								if( value != null ) 
 								{
-									solrItem.addDynamicField( strName, value.toString( ));	
+									item.addDynamicField( strName, value.toString( ));	
 								}
 							}
 						} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
@@ -120,8 +116,10 @@ public class ExtendSolrItemFieldProvider implements ISolrItemExternalFieldProvid
 						}
 					}
 				});
-				count.incrementAndGet();
-		});
+				solrItem.addChildDocument( extenderType, item );
+		}
+
+	);
 	
 	}
 
