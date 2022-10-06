@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
-import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections.CollectionUtils;
 
 import fr.paris.lutece.plugins.extend.service.extender.facade.ExtenderType;
 import fr.paris.lutece.plugins.extend.service.extender.facade.IExtendableResourceResult;
